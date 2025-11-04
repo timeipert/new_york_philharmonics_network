@@ -1,30 +1,39 @@
 import marimo
 
 __generated_with = "0.17.6"
-app = marimo.App(width="medium")
+app = marimo.App(width="full", app_title="NYP Transformer")
 
 
 @app.cell
 def _():
     import marimo as mo
-    return (mo,)
-
-
-@app.cell
-def _():
     import json
     import pandas as pd
     import glob
     from typing import List, Dict, Any, Union
-
-
-    return json, pd
+    return json, mo, pd
 
 
 @app.cell
+def _():
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    # NYP Dataset Transformer
+    Ein Skript, das die JSON-Datei aus dem NYP Archiv in eine Edge List-CSV konvertiert.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     ## Laden
+
+    Wähle die JSON-Datei über den Upload-Button aus.
 
     * Dieser Prozess ist dafür verantwortlich, die Rohdaten aus den externen Dateien in den Arbeitsspeicher zu bringen.
     * Das Ziel ist, Zugriff auf alle Programminformationen erhalten. Jede gefundene JSON-Datei wird einzeln mit der json-Bibliothek eingelesen und in ein Python-Dictionary umgewandelt.
@@ -37,45 +46,39 @@ def _(mo):
 def _(mo):
     file_picker = mo.ui.file(multiple=False
     )
-
     marimo_file = file_picker
     file_picker
     return file_picker, marimo_file
 
 
 @app.cell
-def _():
-    return
-
-
-@app.cell
-def _(file_picker, json, marimo_file):
+def _(file_picker, json, marimo_file, mo, pd):
     if file_picker.value:
         mo_file = marimo_file.value[0]
         print(mo_file)
-    
-    
+
+
         all_programs = []
-    
+
         try:
             file_content = mo_file.contents.decode('utf-8')
             data = json.loads(file_content)
-    
+
             if 'programs' in data:
                 all_programs.extend(data['programs'])
             else:
                 all_programs.extend(data)
-            
+
         except json.JSONDecodeError:
             print(f"Fehler: Ungültiges JSON-Format in der Datei .")
         except Exception as e:
             print(f"Fehler beim Verarbeiten der Datei {e}")
-            
-        print(all_programs)
+
+        mo.output.replace(pd.DataFrame(all_programs))
     return (all_programs,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     ## Extraktion
@@ -97,52 +100,51 @@ def _(mo):
 
 
 @app.cell
-def _(all_programs, pd):
+def _(all_programs, file_picker, mo, pd):
     """
     Extrahiert Kollaborationen (Kanten) zwischen Dirigenten und Solisten pro Werk.
 
     Args:
         programs: Eine Liste von Programm-Dictionaries aus den NYP-Daten.
-    
+
     Returns:
         Ein Pandas DataFrame, das die Kantenliste (Source, Target, Date) darstellt.
     """
-
-    edges = []
-
-    for program in all_programs:
-        concert_date = None
-        if program.get('concerts') and program['concerts'][0].get('Date'):
-            concert_date = program['concerts'][0]['Date'].split('T')[0]
-
-        for work in program.get('works', []):
-            if work.get('interval') == "Intermission" or not concert_date:
-                continue
-
-            soloists = [s['soloistName'] for s in work.get('soloists', []) if s.get('soloistName')]
-            for i in range(len(soloists)):
-                source = soloists[i].strip()
-                for j in range(i + 1, len(soloists)):
-                    target = soloists[j].strip()
-                
-                    if source and target and source != target:
-                        edges.append({
-                            'Source': source,
-                            'Target': target,
-                            'Date': concert_date,
-                            'WorkID': work.get('ID', 'N/A')
-                        })
-                    
-    df = pd.DataFrame(edges)
-    df
-
-
-
+    if file_picker.value:
+        edges = []
+    
+        for program in all_programs:
+            concert_date = None
+            if program.get('concerts') and program['concerts'][0].get('Date'):
+                concert_date = program['concerts'][0]['Date'].split('T')[0]
+    
+            for work in program.get('works', []):
+                if work.get('interval') == "Intermission" or not concert_date:
+                    continue
+    
+                soloists = [s['soloistName'] for s in work.get('soloists', []) if s.get('soloistName')]
+                for i in range(len(soloists)):
+                    source = soloists[i].strip()
+                    for j in range(i + 1, len(soloists)):
+                        target = soloists[j].strip()
+    
+                        if source and target and source != target:
+                            edges.append({
+                                'Source': source,
+                                'Target': target,
+                                'Date': concert_date,
+                                'WorkID': work.get('ID', 'N/A')
+                            })
+    
+        df = pd.DataFrame(edges)
+        mo.output.replace(df)
+    
+    
 
     return (df,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     ## Aggregation
@@ -162,35 +164,31 @@ def _(mo):
 
 
 @app.cell
-def _(df):
-    # 3. Aggregation (Zählen der Häufigkeit pro Kollaboration/Kante)
-    # Da wir eine temporale Analyse machen wollen, lassen wir das Datum zunächst drin,
-    # aber wir können die Gesamtanzahl als "Weight" hinzufügen.
-    # Für die Darstellung der Häufigkeit ("wie häufig eine Erwähnung haben")
-    df_agg = df.groupby(['Source', 'Target']).size().reset_index(name='Weight')
-    df_agg
+def _(df, file_picker, mo):
+    if file_picker.value:
+        df_agg = df.groupby(['Source', 'Target']).size().reset_index(name='Weight')
+        mo.output.replace(df_agg)
+    
     return (df_agg,)
 
 
 @app.cell
-def _(df_agg):
-    """
-    Speichert das DataFrame der Kantenliste in eine CSV-Datei.
-    """
-    df_agg.to_csv("nyp_collaboration_network.csv", index=False)
-    print(f"Kantenliste erfolgreich gespeichert unter: nyp_collaboration_network.csv")
-
+def _(df_agg, file_picker):
+    if file_picker.value:
+        df_agg.to_csv("nyp_collaboration_network.csv", index=False)
+        print(f"Kantenliste erfolgreich gespeichert unter: nyp_collaboration_network.csv")
     return
 
 
 @app.cell
-def _(df_agg, mo):
-    download_txt = mo.download(
-        data=df_agg.to_csv(),
-        filename="nyp_network.csv",
-        mimetype="text/csv",
-    )
-    mo.md(f"{download_txt}")
+def _(df_agg, file_picker, mo):
+    if file_picker.value:
+        download_txt = mo.download(
+            data=df_agg.to_csv(),
+            filename="nyp_network.csv",
+            mimetype="text/csv",
+        )
+        mo.md(f"{download_txt}")
     return
 
 
