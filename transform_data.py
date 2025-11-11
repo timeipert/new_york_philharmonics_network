@@ -112,22 +112,22 @@ def _(all_programs, file_picker, mo, pd):
     """
     if file_picker.value:
         edges = []
-    
+
         for program in all_programs:
             concert_date = None
             if program.get('concerts') and program['concerts'][0].get('Date'):
                 concert_date = program['concerts'][0]['Date'].split('T')[0]
-    
+
             for work in program.get('works', []):
                 if work.get('interval') == "Intermission" or not concert_date:
                     continue
-    
+
                 soloists = [s['soloistName'] for s in work.get('soloists', []) if s.get('soloistName')]
                 for i in range(len(soloists)):
                     source = soloists[i].strip()
                     for j in range(i + 1, len(soloists)):
                         target = soloists[j].strip()
-    
+
                         if source and target and source != target:
                             edges.append({
                                 'Source': source,
@@ -135,11 +135,10 @@ def _(all_programs, file_picker, mo, pd):
                                 'Date': concert_date,
                                 'WorkID': work.get('ID', 'N/A')
                             })
-    
+
         df = pd.DataFrame(edges)
         mo.output.replace(df)
-    
-    
+
 
     return (df,)
 
@@ -168,7 +167,7 @@ def _(df, file_picker, mo):
     if file_picker.value:
         df_agg = df.groupby(['Source', 'Target']).size().reset_index(name='Weight')
         mo.output.replace(df_agg)
-    
+
     return (df_agg,)
 
 
@@ -182,13 +181,14 @@ def _(df_agg, file_picker):
 
 @app.cell
 def _(df_agg, file_picker, mo):
+    download_txt = ""
     if file_picker.value:
         download_txt = mo.download(
             data=df_agg.to_csv(),
             filename="nyp_network.csv",
             mimetype="text/csv",
         )
-        mo.md(f"{download_txt}")
+    mo.md(f"{download_txt}")
     return
 
 
