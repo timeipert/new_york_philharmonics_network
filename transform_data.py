@@ -55,8 +55,6 @@ def _(mo):
 def _(file_picker, json, marimo_file, mo, pd):
     if file_picker.value:
         mo_file = marimo_file.value[0]
-        print(mo_file)
-
 
         all_programs = []
 
@@ -64,10 +62,10 @@ def _(file_picker, json, marimo_file, mo, pd):
             file_content = mo_file.contents.decode('utf-8')
             data = json.loads(file_content)
 
-            if 'programs' in data:
-                all_programs.extend(data['programs'])
-            else:
-                all_programs.extend(data)
+            if 'programs' not in data:
+                return False
+
+            all_programs.extend(data['programs'])
 
         except json.JSONDecodeError:
             print(f"Fehler: Ungültiges JSON-Format in der Datei .")
@@ -75,7 +73,7 @@ def _(file_picker, json, marimo_file, mo, pd):
             print(f"Fehler beim Verarbeiten der Datei {e}")
 
         mo.output.replace(pd.DataFrame(all_programs))
-    return (all_programs,)
+    return all_programs
 
 
 @app.cell(hide_code=True)
@@ -184,7 +182,7 @@ def _(df_agg, file_picker, mo):
     download_txt = ""
     if file_picker.value:
         download_txt = mo.download(
-            data=df_agg.to_csv(),
+            data=df_agg.to_csv(index=False),
             filename="nyp_network.csv",
             mimetype="text/csv",
         )
