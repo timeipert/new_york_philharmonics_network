@@ -62,8 +62,6 @@ def _(file_picker, json, marimo_file, mo, pd):
             file_content = mo_file.contents.decode('utf-8')
             data = json.loads(file_content)
 
-            if 'programs' not in data:
-                return False
 
             all_programs.extend(data['programs'])
 
